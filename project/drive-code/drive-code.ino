@@ -1,20 +1,20 @@
-////
-// MME 4487 Project
-//
-// Language (Arduino C++)
-// Target ESP32
-// Authors: Eric De Faro, Nidhish Sochit, Laura K
+// 
+// MME 4487 Lab 5 Drive
+// 
+//  Language: Arduino (C++)
+//  Target:   ESP32
+//  Author:   Michael Naish
+//  Date:     2023 10 08 
 //
 
-// #define SERIAL_STUDIO
-// #define PRINT_SEND_STATUS
-// #define PRINT_INCOMING
+// #define SERIAL_STUDIO                                 // print formatted string, that can be captured and parsed by Serial-Studio
+// #define PRINT_SEND_STATUS                             // uncomment to turn on output packet send status
+// #define PRINT_INCOMING                                // uncomment to turn on output of incoming data
 
 #include <Arduino.h>
-// #include <esp_now.h>
-// #include <WiFi.h>
-// #include <Adafruit_TCS34725.h>
-
+#include <esp_now.h>
+#include <WiFi.h>
+#include "Adafruit_TCS34725.h"
 
 // Function declarations
 void doHeartbeat();
@@ -23,140 +23,122 @@ void ARDUINO_ISR_ATTR encoderISR(void* arg);
 void onDataRecv(const uint8_t *mac_addr, const uint8_t *incomingData, int len);
 void onDataSent(const uint8_t *mac_addr, esp_now_send_status_t status);
 
-
 // Control data packet structure
-struct ControlDataPacket  
-{
-  int dir;                                                     // drive direction: 1 = forward, -1 = reverse, 0 = stop
-  unsigned long time;                                          // time packet sent
-  int steerDir;                                                // steering direction: 1 = left, -1 - right, 0 = straight
-  int servoPos;                                                // Servo motor arm position to collect item
+struct ControlDataPacket {
+  int dir;                                            // drive direction: 1 = forward, -1 = reverse, 0 = stop
+  unsigned long time;                                 // time packet sent
+  int potPos; // potentiometer position
+  int steer;                                          // steering direction: 1 = left, -1 = right, 0 = nothing
 };
-
 
 // Drive data packet structure
-struct DriveDataPacket  
-{
-  unsigned long time;
-  int ledState;
+struct DriveDataPacket {
+  unsigned long time;                                 // time packet sent
   uint16_t r, g, b, c;
+  int ledState; // 1 = on, 0 = off
 };
-
 
 // Encoder structure
-struct Encoder
-{
-  const int chanA;                                             // GPIO pin for encoder channel A
-  const int chanB;                                             // GPIO pin for encoder channel B
-  long pos;                                                    // current encoder position
+struct Encoder {
+  const int chanA;                                    // GPIO pin for encoder channel A
+  const int chanB;                                    // GPIO pin for encoder channel B
+  long pos;                                           // current encoder position
 };
 
-
 // Constants
-const int cHeartBeatLED = 2;                                   // GPIO pin of built-in LED for heartbeat
-const int cStatusLED = 27;                                     // GPIO pin of commmunication status LED
-const int cTCSLED = 23;                                        // GPIO pin of TCS led
-const int cHeartbeatInterval = 500;                            // heartbeat blink interval in ms
-const int cNumMotors = 2;                                      // Number of DC motors
-const int cIN1Pin[] = {17, 19};
-const int cIN1Chan[] = {0, 1};
-const int cIN2Pin[] = {16, 18};
-const int cIN2Chan[] = {2, 3};
-const int cPWMRes = 8;
-const int cMinPWM = 0;
-const int cMaxPWM = pow(2, cPWMres) - 1;
-const int cPWMFreq = 20000;
-const int cCountsRev = 1096;
-const int cMaxSpeedInCounts = 1600;
-const int cMaxChange = 14;
-const int cMaxDroppedPackets = 20;
-const float kp = 1.5;
-const float ki = 0.2;
-const float kd = 0.8;
-
+const int cHeartbeatLED = 2;                          // GPIO pin of built-in LED for heartbeat
+const int cStatusLED = 27;                            // GPIO pin of communication status LED
+const int cHeartbeatInterval = 500;                   // heartbeat blink interval, in milliseconds
+const int cNumMotors = 2;                             // Number of DC motors
+const int cIN1Pin[] = {17, 19};                       // GPIO pin(s) for INT1
+const int cIN1Chan[] = {0, 1};                        // PWM channe(s) for INT1
+const int c2IN2Pin[] = {16, 18};                      // GPIO pin(s) for INT2
+const int cIN2Chan[] = {2, 3};                        // PWM channel(s) for INT2
+const int cPWMRes = 8;                                // bit resolution for PWM
+const int cMinPWM = 0;                                // PWM value for minimum speed that turns motor
+const int cMaxPWM = pow(2, cPWMRes) - 1;              // PWM value for maximum speed
+const int cPWMFreq = 20000;                           // frequency of PWM signal
+const int cCountsRev = 1096;                          // encoder pulses per motor revolution
+const int cMaxSpeedInCounts = 1600;                   // maximum encoder counts/sec
+const int cMaxChange = 14;                            // maximum increment in counts/cycle
+const int cMaxDroppedPackets = 20;                    // maximum number of packets allowed to drop
+const float kp = 1.5;                                 // proportional gain for PID
+const float ki = 0.2;                                 // integral gain for PID
+const float kd = 0.8;                                 // derivative gain for PID
+const int cTCSLED = 23;
 
 // Variables
-unsigned long lastHeartbeat = 0;                                // time of last heartbeat state change
-unsigned long lastTime = 0;                                     // last time of motor control  update
-unsigned int commsLossCount = 0;                                // number of sequential sent packets that have dropped
-Encoder encoder1[] = {{00, 00, 0},                              // encoder 0 on GPIO 00 and 00, 0 position
-                      {00, 00, 0}};
-long target[] = {0, 0};                                         // target count for motor
-long lastEncoder[] = {0, 0};                                    // encoder count at last control cycle
-float targetF[] = {0.0, 0.0};                                   // target for motor as float
-ControlDataPacket inData;
-DriveDataPacket driveData;
+unsigned long lastHeartbeat = 0;                      // time of last heartbeat state change
+unsigned long lastTime = 0;                           // last time of motor control was updated
+unsigned int commsLossCount = 0;                      // number of sequential sent packets have dropped
+Encoder encoder[] = {{25, 26, 0},                     // encoder 0 on GPIO 25 and 26, 0 position
+                     {32, 33, 0}};                    // encoder 1 on GPIO 32 and 33, 0 position
+long target[] = {0, 0};                               // target encoder count for motor
+long lastEncoder[] = {0, 0};                          // encoder count at last control cycle
+float targetF[] = {0.0, 0.0};                         // target for motor as float
+ControlDataPacket inData;                             // control data packet from controller
+DriveDataPacket driveData;                            // data packet to send controller
 
+// REPLACE WITH MAC ADDRESS OF YOUR CONTROLLER ESP32
+uint8_t receiverMacAddress[] = {0xB0,0xA7,0x32,0x28,0x8B,0xB4};  // MAC address of controller B0:A7:32:28:8B:B4
+esp_now_peer_info_t peerInfo = {};                    // ESP-NOW peer information
 
-// Connection between the two ESP32 controllers
-uint8_t receoverMacAddress[] = {0xB0, 0xA7, 0x32, 0x28, 0x8B, 0xB4};
-esp_now_peer_info_t peerInfo = {};
-
-
-// TCS colour sensor configuration
 Adafruit_TCS34725 tcs = Adafruit_TCS34725(TCS34725_INTEGRATIONTIME_2_4MS, TCS34725_GAIN_4X);
 bool tcsFlag = 0;
 
-
-
-
 void setup() {
-  Serial.begin(115200);
-  Wifi.mode(WIFI_STA);
-  Serial.print("MAC Address ");
-  Serial.println(WiFi.macAddress());
-  Wifi.disconnect();
-
-
-// Connect to TCS34725 colour sensor
-  if (tcs.begin())  
-  {
-    Serial.printf("Found TCS34725 colour sensor\n");
-    tcsFlag = true;
-    digitalWrite(cTCSLED, 1);
-  } 
-  else  
-  {
-    Serial.printf("No TCS34725 found ... check your conections\n");
-    tcsFlag = false;
-  }
-
-  pinMode(cHeartBeatLED, OUTPUT);
-  pinMode(cStatusLED, OUTPUT);
+  Serial.begin(115200);                               // Standard baud rate for ESP32 serial monitor
+  WiFi.mode(WIFI_STA);                                // Use WiFi in station mode
+  Serial.print("MAC address ");
+  Serial.println(WiFi.macAddress());                  // print MAC address of ESP32
+  WiFi.disconnect();                                  // disconnect from network
+  
+  pinMode(cHeartbeatLED, OUTPUT);                     // configure built-in LED for heartbeat
+  pinMode(cStatusLED, OUTPUT);                        // configure GPIO for communication status LED as output
   pinMode(cTCSLED, OUTPUT);
 
-// Setup motors with encoders
-  for (int k = 0; k < cNumMotors; k++)  
-  {
-    ledcAttachPin(cIN1Pin[k], cIN1Chan[k]);
-    ledcSetup(cIN1Chan[k], cPWMFreq, cPWMRes);
-    ledcAttachPin(cIN2Pin[k], cIN2Chan[k]);
-    ledcSetup(cIN2Chan[k], cPWMFreq, cPWMRes);
-    pinMode(encoder[k].chanA, INPUT);
-    pinMode(encoder[k].chanB, INPUT);
+  // Connect to TCS34725 colour sensor
+  if (tcs.begin()) {
+    Serial.printf("Found TCS34725 colour sensor\n");
+    tcsFlag = true;
+    digitalWrite(cTCSLED, 1);                         // turn on onboard LED 
+  } 
+  else {
+    Serial.printf("No TCS34725 found ... check your connections\n");
+    tcsFlag = false;
+  }
+ 
+  // setup motors with encoders
+  for (int k = 0; k < cNumMotors; k++) {
+    ledcAttachPin(cIN1Pin[k], cIN1Chan[k]);           // attach INT1 GPIO to PWM channel
+    ledcSetup(cIN1Chan[k], cPWMFreq, cPWMRes);        // configure PWM channel frequency and resolution
+    ledcAttachPin(c2IN2Pin[k], cIN2Chan[k]);          // attach INT2 GPIO to PWM channel
+    ledcSetup(cIN2Chan[k], cPWMFreq, cPWMRes);        // configure PWM channel frequency and resolution
+    pinMode(encoder[k].chanA, INPUT);                 // configure GPIO for encoder channel A input
+    pinMode(encoder[k].chanB, INPUT);                 // configure GPIO for encoder channel B input
+    // configure encoder to trigger interrupt with each rising edge on channel A
     attachInterruptArg(encoder[k].chanA, encoderISR, &encoder[k], RISING);
   }
 
-
-// Initialize ESP-NOW
-  if (esp_now_init() != ESP_OK
+  // Initialize ESP-NOW
+  if (esp_now_init() != ESP_OK) 
   {
     Serial.printf("Error initializing ESP-NOW\n");
     return;
   }
   else
   {
-    Serial.printf("Sucessfully initialized ESP-NOW\n");
+    Serial.printf("Successfully initialized ESP-NOW\n");
   }
   esp_now_register_recv_cb(onDataRecv);               // register callback function for received data
   esp_now_register_send_cb(onDataSent);               // register callback function for data transmission
-
-// Set controller info
+  
+  // Set controller info
   memcpy(peerInfo.peer_addr, receiverMacAddress, 6);  // set address of peer
   peerInfo.channel = 0;                               // set peer channel
   peerInfo.encrypt = false;                           // no encryption of data
-
-// Add controller as ESP-NOW peer
+  
+  // Add controller as ESP-NOW peer        
   if (esp_now_add_peer(&peerInfo) != ESP_OK)
   {
     Serial.printf("Failed to add peer\n");
@@ -195,7 +177,7 @@ void loop() {
       driveData.ledState = 1;
     }
   }
-
+  
   // if too many sequential packets have dropped, assume loss of controller, restart as safety measure
    if (commsLossCount > cMaxDroppedPackets) {
     delay(1000);                                      // okay to block here as nothing else should be happening
@@ -288,9 +270,11 @@ void loop() {
     }
   }
   doHeartbeat();                                      // update heartbeat LED
+  //Serial.println(inData.steer);
+  //Serial.println(inData.dir);
 }
 
-// Heartbeat LED blink function
+// blink heartbeat LED
 void doHeartbeat() {
   unsigned long curMillis = millis();                 // get the current time in milliseconds
   // check to see if elapsed time matches the heartbeat interval
@@ -300,7 +284,7 @@ void doHeartbeat() {
   }
 }
 
-// Motor control signals based on direction and PWM
+// send motor control signals, based on direction and pwm (speed)
 void setMotor(int dir, int pwm, int in1, int in2) {
   if (dir == 1) {                                     // forward
     ledcWrite(in1, pwm);
@@ -316,7 +300,9 @@ void setMotor(int dir, int pwm, int in1, int in2) {
   }
 }
 
-// Encoder ISR, argument is pointer to encoder structure, which is statically cast to an Encoder structure (more than 1 encoder ISR able to be created)
+// encoder interrupt service routine
+// argument is pointer to an encoder structure, which is statically cast to a Encoder structure, allowing multiple
+// instances of the encoderISR to be created (1 per encoder)
 void ARDUINO_ISR_ATTR encoderISR(void* arg) {
   Encoder* s = static_cast<Encoder*>(arg);            // cast pointer to static structure
   
@@ -329,7 +315,7 @@ void ARDUINO_ISR_ATTR encoderISR(void* arg) {
   }
 }
 
-// Callback function for when data is recieved
+// callback function for when data is received
 void onDataRecv(const uint8_t *mac_addr, const uint8_t *incomingData, int len) {
   if (len == 0)                                       // if empty packet
   {
