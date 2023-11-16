@@ -233,9 +233,15 @@ void loop() {
       if (commsLossCount < cMaxDroppedPackets / 4) {
         
         if (k == 0 && inData.steer == 1)  {
-        setMotor(dir[k] = -1, pwm[k], cIN1Chan[k], cIN2Chan[k]); // update motor speed and direction
+          setMotor(dir[k] = -1, pwm[k], cIN1Chan[k], cIN2Chan[k]); // update motor speed and direction
+        }
+        else if (k == 0 && inData.steer == -1)  {
+          setMotor(dir[k] = 1, pwm[k], cIN1Chan[k], cIN2Chan[k]); // update motor speed and direction
         }
         else if (k == 1 && inData.steer == -1)  {
+          setMotor(dir[k] = 1, pwm[k], cIN1Chan[k], cIN2Chan[k]);    // only change made is instead of turning off motor, reverse direction to turn in place
+        }
+        else if (k == 1 && inData.steer == 1) {
           setMotor(dir[k] = -1, pwm[k], cIN1Chan[k], cIN2Chan[k]);    // only change made is instead of turning off motor, reverse direction to turn in place
         }
         else  {
