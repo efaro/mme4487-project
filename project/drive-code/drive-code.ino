@@ -187,7 +187,12 @@ void loop() {
   // store encoder positions to avoid conflicts with ISR updates
   noInterrupts();                                     // disable interrupts temporarily while reading
   for (int k = 0; k < cNumMotors; k++) {
+
     pos[k] = encoder[k].pos;                          // read and store current motor position
+
+    if (commsLossCount > cMaxDroppedPackets)  {
+      setMotor(dir[k], pwm[k] = 0, cIN1Chan[k], cIN2Chan[k])  // stop motor if connection lost
+    }
   }
   interrupts();                                       // turn interrupts back on
 
@@ -251,6 +256,7 @@ void loop() {
       else {
         setMotor(0, 0, cIN1Chan[k], cIN2Chan[k]);     // stop motor
       }
+
 
 #ifdef SERIAL_STUDIO
       if (k == 0) {
