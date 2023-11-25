@@ -274,6 +274,14 @@ void loop() {
         setMotor(0, 0, cIN1Chan[k], cIN2Chan[k]);     // stop motor
       }
 
+      // Automatic collection
+      unsigned long prevTime = 0;
+      unsigned long currentTime = millis();
+      
+      // if (inData.servoPos == 0) {
+        
+      // }
+
 #ifdef SERIAL_STUDIO
       if (k == 0) {
         printf("/*");                                 // start of sequence for Serial Studio parsing
@@ -298,16 +306,16 @@ void loop() {
     }
   }
 
-  if (inData.servoPos == 0)  {
-    servoRight.pos = 25;
-    servoLeft.pos = 135;
-  }
-  else  {
-    servoRight.pos = 60;
-    servoLeft.pos = 90;
-  }
-  ledcWrite(servoRight.chan, degreesToDutyCycle(servoRight.pos));
-  ledcWrite(servoLeft.chan, degreesToDutyCycle(servoLeft.pos));
+  // if (inData.servoPos == 0)  {
+  //   servoRight.pos = 25;
+  //   servoLeft.pos = 135;
+  // }
+  // else  {
+  //   servoRight.pos = 60;
+  //   servoLeft.pos = 90;
+  // }
+  // ledcWrite(servoRight.chan, degreesToDutyCycle(servoRight.pos));
+  // ledcWrite(servoLeft.chan, degreesToDutyCycle(servoLeft.pos));
 
   doHeartbeat();                                      // update heartbeat LED
   //Serial.println(inData.steer);
