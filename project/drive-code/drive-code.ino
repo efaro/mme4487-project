@@ -1,15 +1,16 @@
 // 
-// MME 4487 Lab 5 Drive
+// MME 4487 Project Drive Code
 // 
 //  Language: Arduino (C++)
 //  Target:   ESP32
-//  Author:   Michael Naish
-//  Date:     2023 10 08 
+//  Author:   
+//  Date:     
 //
 
 // #define SERIAL_STUDIO                                 // print formatted string, that can be captured and parsed by Serial-Studio
 // #define PRINT_SEND_STATUS                             // uncomment to turn on output packet send status
 // #define PRINT_INCOMING                                // uncomment to turn on output of incoming data
+#define PRINT_COLOUR
 
 #include <Arduino.h>
 #include <esp_now.h>
@@ -269,18 +270,34 @@ void loop() {
         else  {
           setMotor(dir[k], pwm[k], cIN1Chan[k], cIN2Chan[k]);
         }
+
+        // unsigned long previousTime = 0;
+        // unsigned long currentTime = millis();
+        // if (inData.servoPos == 0)  {
+        //   servoRight.pos = 25;
+        //   servoLeft.pos = 135;
+        //   ledcWrite(servoRight.chan, degreesToDutyCycle(servoRight.pos));
+        //   ledcWrite(servoLeft.chan, degreesToDutyCycle(servoLeft.pos));
+        //   if ((currentTime - previousTime) > 2000)  {
+        //     previousTime = currentTime;
+        //     setMotor(dir[0] = 1, pwm[0], cIN1Chan[0], cIN2Chan[0]);
+        //     setMotor(dir[1] = 1, pwm[1], cIN1Chan[1], cIN2Chan[1]);
+        //   }
+
+        //   if ((currentTime - previousTime) > 1000)  {
+        //     currentTime = previousTime;
+        //     servoRight.pos = 60;
+        //     servoLeft.pos = 90;
+        //     ledcWrite(servoRight.chan, degreesToDutyCycle(servoRight.pos));
+        //     ledcWrite(servoLeft.chan, degreesToDutyCycle(servoLeft.pos));
+        //     setMotor(dir[0] = 0, pwm[0], cIN1Chan[0], cIN2Chan[0]);
+        //     setMotor(dir[1] = 0, pwm[1], cIN1Chan[1], cIN2Chan[1]);
+        //   }
+        // }
       }
       else {
         setMotor(0, 0, cIN1Chan[k], cIN2Chan[k]);     // stop motor
       }
-
-      // Automatic collection
-      unsigned long prevTime = 0;
-      unsigned long currentTime = millis();
-      
-      // if (inData.servoPos == 0) {
-        
-      // }
 
 #ifdef SERIAL_STUDIO
       if (k == 0) {
@@ -306,20 +323,18 @@ void loop() {
     }
   }
 
-  // if (inData.servoPos == 0)  {
-  //   servoRight.pos = 25;
-  //   servoLeft.pos = 135;
-  // }
-  // else  {
-  //   servoRight.pos = 60;
-  //   servoLeft.pos = 90;
-  // }
-  // ledcWrite(servoRight.chan, degreesToDutyCycle(servoRight.pos));
-  // ledcWrite(servoLeft.chan, degreesToDutyCycle(servoLeft.pos));
+  if (inData.servoPos == 0)  {
+    servoRight.pos = 25;
+    servoLeft.pos = 135;
+  }
+  else  {
+    servoRight.pos = 60;
+    servoLeft.pos = 90;
+  }
+  ledcWrite(servoRight.chan, degreesToDutyCycle(servoRight.pos));
+  ledcWrite(servoLeft.chan, degreesToDutyCycle(servoLeft.pos));
 
   doHeartbeat();                                      // update heartbeat LED
-  //Serial.println(inData.steer);
-  //Serial.println(inData.dir);
 }
 
 // blink heartbeat LED
