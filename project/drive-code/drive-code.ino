@@ -187,8 +187,11 @@ void loop() {
 #ifdef PRINT_COLOUR
           Serial.printf("R: %d, G: %d, B: %d, C %d\n", r, g, b, c);
 #endif
-    if (r > 35 && g > 10 && b > 60)  {
+    if ((g - b) > 3 && (g - r) > 3 && c > 20)  {
       driveData.ledState = 1;
+    }
+    else  {
+      driveData.ledState = 0;
     }
   }
   

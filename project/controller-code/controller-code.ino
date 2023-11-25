@@ -121,7 +121,7 @@ void loop() {
   esp_err_t result;
   unsigned long curTime = micros();                   // capture current time in microseconds
   controlData.potPos = analogRead(cPotPinSpeed);
-  if (inData.ledState == 1) {
+  // if (inData.ledState == 1) {
     digitalWrite(cColourLED, HIGH);
   }
   else if (inData.ledState == 0) {
