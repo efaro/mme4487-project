@@ -274,7 +274,6 @@ void loop() {
         setMotor(0, 0, cIN1Chan[k], cIN2Chan[k]);     // stop motor
       }
 
-
 #ifdef SERIAL_STUDIO
       if (k == 0) {
         printf("/*");                                 // start of sequence for Serial Studio parsing

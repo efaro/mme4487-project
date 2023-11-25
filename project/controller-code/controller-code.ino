@@ -50,10 +50,10 @@ const int cColourLED = 25;
 unsigned long lastHeartbeat = 0;                      // time of last heartbeat state change
 unsigned long lastTime = 0;                           // last time of motor control was updated
 unsigned int commsLossCount = 0;                      // number of sequential sent packets have dropped
-Button buttonFwd = {14, 0, 0, false, true, true};     // forward, NO pushbutton on GPIO 14, low state when pressed
-Button buttonRev = {12, 0, 0, false, true, true};     // reverse, NO pushbutton on GPIO 12, low state when pressed
-Button buttonRight = {27, 0, 0, false, true, true};
-Button buttonLeft = {13, 0, 0, false, true, true};
+Button buttonReverse = {14, 0, 0, false, true, true};     // forward, NO pushbutton on GPIO 14, low state when pressed
+Button buttonForward = {12, 0, 0, false, true, true};     // reverse, NO pushbutton on GPIO 12, low state when pressed
+Button buttonLeft = {27, 0, 0, false, true, true};
+Button buttonRight = {13, 0, 0, false, true, true};
 Button buttonServo = {21, 0, 0, false, true, true};   // button for manually opening/closing servo motor
 
 // REPLACE WITH MAC ADDRESS OF YOUR DRIVE ESP32 - B0:A7:32:28:8B:B4
@@ -73,14 +73,14 @@ void setup() {
   pinMode(cHeartbeatLED, OUTPUT);                     // configure built-in LED for heartbeat as output
   pinMode(cStatusLED, OUTPUT);                        // configure GPIO for communication status LED as output
   pinMode(cColourLED, OUTPUT);
-  pinMode(buttonFwd.pin, INPUT_PULLUP);               // configure GPIO for forward button pin as an input with pullup resistor
-  attachInterruptArg(buttonFwd.pin, buttonISR, &buttonFwd, CHANGE); // Configure forward pushbutton ISR to trigger on change
-  pinMode(buttonRev.pin, INPUT_PULLUP);               // configure GPIO for reverse button pin as an input with pullup resistor
-  attachInterruptArg(buttonRev.pin, buttonISR, &buttonRev, CHANGE); // Configure reverse pushbutton ISR to trigger on change
-  pinMode(buttonRight.pin, INPUT_PULLUP);
-  attachInterruptArg(buttonRight.pin, buttonISR, &buttonRight, CHANGE);
+  pinMode(buttonReverse.pin, INPUT_PULLUP);               // configure GPIO for forward button pin as an input with pullup resistor
+  attachInterruptArg(buttonReverse.pin, buttonISR, &buttonReverse, CHANGE); // Configure forward pushbutton ISR to trigger on change
+  pinMode(buttonForward.pin, INPUT_PULLUP);               // configure GPIO for reverse button pin as an input with pullup resistor
+  attachInterruptArg(buttonForward.pin, buttonISR, &buttonForward, CHANGE); // Configure reverse pushbutton ISR to trigger on change
   pinMode(buttonLeft.pin, INPUT_PULLUP);
   attachInterruptArg(buttonLeft.pin, buttonISR, &buttonLeft, CHANGE);
+  pinMode(buttonRight.pin, INPUT_PULLUP);
+  attachInterruptArg(buttonRight.pin, buttonISR, &buttonRight, CHANGE);
   pinMode(buttonServo.pin, INPUT_PULLUP);
   attachInterruptArg(buttonServo.pin, buttonISR, &buttonServo, CHANGE);
   pinMode(cPotPinSpeed, INPUT);  // potentiometer pin 
@@ -121,7 +121,7 @@ void loop() {
   esp_err_t result;
   unsigned long curTime = micros();                   // capture current time in microseconds
   controlData.potPos = analogRead(cPotPinSpeed);
-  // if (inData.ledState == 1) {
+   if (inData.ledState == 1) {
     digitalWrite(cColourLED, HIGH);
   }
   else if (inData.ledState == 0) {
@@ -133,11 +133,13 @@ void loop() {
     lastTime = curTime;
     controlData.time = curTime;                       // update transmission time
   
-    if (!buttonFwd.state) {                           // forward pushbutton pressed
-      controlData.dir = 1;
-    }
-    else if (!buttonRev.state) {                      // reverse pushbutton pressed
+    if (!buttonReverse.state) {                           // forward pushbutton pressed
       controlData.dir = -1;
+      Serial.println("Going backward!");
+    }
+    else if (!buttonForward.state) {                      // reverse pushbutton pressed
+      controlData.dir = 1;
+      Serial.println("Going forward!");
     }
     else {                                            // no input, stop
       controlData.dir = 0;
@@ -147,14 +149,17 @@ void loop() {
       controlData.dir = 0;
     }
     // logic for steering - NOT SURE ABOUT THIS
-    if (!buttonLeft.state)  {
+    if (!buttonRight.state)  {
       controlData.steer = 1;
+      Serial.println("Turning right!");
     }
-    else if (!buttonRight.state)  {
+    else if (!buttonLeft.state)  {
       controlData.steer = -1;
+      Serial.println("Turning left!");
     }
     else  {
       controlData.steer = 0;
+      Serial.println(" ");
     }
 
     //Serial.println(buttonLeft.state);
