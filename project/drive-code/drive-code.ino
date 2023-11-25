@@ -29,6 +29,7 @@ struct ControlDataPacket {
   unsigned long time;                                 // time packet sent
   int potPos; // potentiometer position
   int steer;                                          // steering direction: 1 = left, -1 = right, 0 = nothing
+  int servoPos;
 };
 
 // Drive data packet structure
@@ -43,6 +44,12 @@ struct Encoder {
   const int chanA;                                    // GPIO pin for encoder channel A
   const int chanB;                                    // GPIO pin for encoder channel B
   long pos;                                           // current encoder position
+};
+
+struct Servo  {
+  const int pin;
+  const int chan;
+  int pos;
 };
 
 // Constants
@@ -67,12 +74,15 @@ const float ki = 0.2;                                 // integral gain for PID
 const float kd = 0.8;                                 // derivative gain for PID
 const int cTCSLED = 23;
 
+
 // Variables
 unsigned long lastHeartbeat = 0;                      // time of last heartbeat state change
 unsigned long lastTime = 0;                           // last time of motor control was updated
 unsigned int commsLossCount = 0;                      // number of sequential sent packets have dropped
 Encoder encoder[] = {{25, 26, 0},                     // encoder 0 on GPIO 25 and 26, 0 position
                      {32, 33, 0}};                    // encoder 1 on GPIO 32 and 33, 0 position
+Servo servoRight = {2, 4, 0};                             // servo 1 pin, channel 5, position
+Servo servoLeft = {4, 5, 0};                            // servo 2 pin, channel 6, position
 long target[] = {0, 0};                               // target encoder count for motor
 long lastEncoder[] = {0, 0};                          // encoder count at last control cycle
 float targetF[] = {0.0, 0.0};                         // target for motor as float
@@ -96,6 +106,10 @@ void setup() {
   pinMode(cHeartbeatLED, OUTPUT);                     // configure built-in LED for heartbeat
   pinMode(cStatusLED, OUTPUT);                        // configure GPIO for communication status LED as output
   pinMode(cTCSLED, OUTPUT);
+  ledcAttachPin(servoRight.pin, servoRight.chan);
+  ledcAttachPin(servoLeft.pin, servoLeft.chan);
+  ledcSetup(servoRight.chan, 50, 16);
+  ledcSetup(servoLeft.chan, 50, 16);
 
   // Connect to TCS34725 colour sensor
   if (tcs.begin()) {
@@ -281,6 +295,18 @@ void loop() {
       digitalWrite(cStatusLED, 1);                    // turn on communication status LED
     }
   }
+
+  if (inData.servoPos == 0)  {
+    servoRight.pos = 25;
+    servoLeft.pos = 135;
+  }
+  else  {
+    servoRight.pos = 60;
+    servoLeft.pos = 90;
+  }
+  ledcWrite(servoRight.chan, degreesToDutyCycle(servoRight.pos));
+  ledcWrite(servoLeft.chan, degreesToDutyCycle(servoLeft.pos));
+
   doHeartbeat();                                      // update heartbeat LED
   //Serial.println(inData.steer);
   //Serial.println(inData.dir);
@@ -294,6 +320,21 @@ void doHeartbeat() {
     lastHeartbeat = curMillis;                        // update the heartbeat toggle time for the next cycle
     digitalWrite(cHeartbeatLED, !digitalRead(cHeartbeatLED)); // toggle state of LED
   }
+}
+
+long degreesToDutyCycle(int deg) {
+  const long cl_MinDutyCycle = 1650;                 // duty cycle for 0 degrees
+  const long cl_MaxDutyCycle = 8175;                 // duty cycle for 180 degrees
+
+  long l_DutyCycle = map(deg, 0, 180, cl_MinDutyCycle, cl_MaxDutyCycle);  // convert to duty cycle
+
+#ifdef OUTPUT_ON
+  float f_Percent = l_DutyCycle * 0.0015259;         // dutyCycle / 65535 * 100
+  Serial.printf("Degrees %d, Duty Cycle Val: %ld = %f%%\n", i_ServoPos, l_DutyCycle, f_Percent);
+  Serial.begin(115200);
+#endif
+
+  return l_DutyCycle;
 }
 
 // send motor control signals, based on direction and pwm (speed)

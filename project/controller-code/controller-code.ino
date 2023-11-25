@@ -27,6 +27,7 @@ struct ControlDataPacket {
   unsigned long time;                                 // time packet sent
   int potPos; // potentiometer position
   int steer; 
+  int servoPos;
 };
 
 // Drive data packet structure
@@ -42,7 +43,7 @@ const int cHeartbeatInterval = 500;                   // heartbeat blink interva
 const int cStatusLED = 26;                            // GPIO pin of communication status LED
 const long cDebounceDelay = 20;                       // button debounce delay in milliseconds
 const int cMaxDroppedPackets = 20;                    // maximum number of packets allowed to drop
-const int cPotPin = 34;
+const int cPotPinSpeed = 34;                          // GPIO pin of potentiometer controlling the speed of the motors
 const int cColourLED = 25;
 
 // Variables
@@ -53,6 +54,7 @@ Button buttonFwd = {14, 0, 0, false, true, true};     // forward, NO pushbutton 
 Button buttonRev = {12, 0, 0, false, true, true};     // reverse, NO pushbutton on GPIO 12, low state when pressed
 Button buttonRight = {27, 0, 0, false, true, true};
 Button buttonLeft = {13, 0, 0, false, true, true};
+Button buttonServo = {21, 0, 0, false, true, true};   // button for manually opening/closing servo motor
 
 // REPLACE WITH MAC ADDRESS OF YOUR DRIVE ESP32 - B0:A7:32:28:8B:B4
 uint8_t receiverMacAddress[] = {0xE0,0xE2,0xE6,0x0C,0x49,0x64};  // MAC address of drive 00:01:02:03:04:05 
@@ -79,7 +81,9 @@ void setup() {
   attachInterruptArg(buttonRight.pin, buttonISR, &buttonRight, CHANGE);
   pinMode(buttonLeft.pin, INPUT_PULLUP);
   attachInterruptArg(buttonLeft.pin, buttonISR, &buttonLeft, CHANGE);
-  pinMode(cPotPin, INPUT);  // potentiometer pin 
+  pinMode(buttonServo.pin, INPUT_PULLUP);
+  attachInterruptArg(buttonServo.pin, buttonISR, &buttonServo, CHANGE);
+  pinMode(cPotPinSpeed, INPUT);  // potentiometer pin 
 
   // Initialize ESP-NOW
   if (esp_now_init() != ESP_OK) 
@@ -116,7 +120,7 @@ void setup() {
 void loop() {
   esp_err_t result;
   unsigned long curTime = micros();                   // capture current time in microseconds
-  controlData.potPos = analogRead(cPotPin);
+  controlData.potPos = analogRead(cPotPinSpeed);
   if (inData.ledState == 1) {
     digitalWrite(cColourLED, HIGH);
   }
@@ -153,8 +157,8 @@ void loop() {
       controlData.steer = 0;
     }
 
-    Serial.println(buttonLeft.state);
-    Serial.println(buttonRight.state);
+    //Serial.println(buttonLeft.state);
+    //Serial.println(buttonRight.state);
     
     // send control signal to drive
     result = esp_now_send(receiverMacAddress, (uint8_t *) &controlData, sizeof(controlData));
@@ -164,6 +168,14 @@ void loop() {
     else {                                            // otherwise
       digitalWrite(cStatusLED, 1);                    // turn on communication status LED
     }
+  }
+// Setting the servo position - dont forget to write the position in the drive code
+  if (!buttonServo.state) {
+    Serial.println("Gate is Open!");
+    controlData.servoPos = 1; // open
+  }
+  else  {
+    controlData.servoPos = 0; // closed
   }
   doHeartbeat();                                      // update heartbeat LED
 }
