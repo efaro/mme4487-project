@@ -27,7 +27,7 @@ struct ControlDataPacket {
   unsigned long time;                                 // time packet sent
   int potPos; // potentiometer position
   int steer; 
-  int servoPos;
+  int sort;
 };
 
 // Drive data packet structure
@@ -54,7 +54,7 @@ Button buttonReverse = {14, 0, 0, false, true, true};     // forward, NO pushbut
 Button buttonForward = {12, 0, 0, false, true, true};     // reverse, NO pushbutton on GPIO 12, low state when pressed
 Button buttonLeft = {27, 0, 0, false, true, true};
 Button buttonRight = {13, 0, 0, false, true, true};
-Button buttonServo = {21, 0, 0, false, true, true};   // button for manually opening/closing servo motor
+Button buttonScan = {21, 0, 0, false, true, true};   // button for manually opening/closing servo motor
 
 // REPLACE WITH MAC ADDRESS OF YOUR DRIVE ESP32 - B0:A7:32:28:8B:B4
 uint8_t receiverMacAddress[] = {0xE0,0xE2,0xE6,0x0C,0x49,0x64};  // MAC address of drive 00:01:02:03:04:05 
@@ -81,8 +81,8 @@ void setup() {
   attachInterruptArg(buttonLeft.pin, buttonISR, &buttonLeft, CHANGE);
   pinMode(buttonRight.pin, INPUT_PULLUP);
   attachInterruptArg(buttonRight.pin, buttonISR, &buttonRight, CHANGE);
-  pinMode(buttonServo.pin, INPUT_PULLUP);
-  attachInterruptArg(buttonServo.pin, buttonISR, &buttonServo, CHANGE);
+  pinMode(buttonScan.pin, INPUT_PULLUP);
+  attachInterruptArg(buttonScan.pin, buttonISR, &buttonScan, CHANGE);
   pinMode(cPotPinSpeed, INPUT);  // potentiometer pin 
 
   // Initialize ESP-NOW
@@ -175,12 +175,12 @@ void loop() {
     }
   }
 // Setting the servo position - dont forget to write the position in the drive code
-  if (!buttonServo.state) {
-    Serial.println("Gate is Open!");
-    controlData.servoPos = 1; // open
+  if (!buttonScan.state) {
+    Serial.println("Sorting...");
+    controlData.sort = 1; // open
   }
   else  {
-    controlData.servoPos = 0; // closed
+    controlData.sort = 0; // closed
   }
   doHeartbeat();                                      // update heartbeat LED
 }

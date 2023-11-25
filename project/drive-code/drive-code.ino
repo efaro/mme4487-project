@@ -30,7 +30,7 @@ struct ControlDataPacket {
   unsigned long time;                                 // time packet sent
   int potPos; // potentiometer position
   int steer;                                          // steering direction: 1 = left, -1 = right, 0 = nothing
-  int servoPos;
+  int sort;
 };
 
 // Drive data packet structure
@@ -189,12 +189,12 @@ void loop() {
 #ifdef PRINT_COLOUR
           Serial.printf("R: %d, G: %d, B: %d, C %d\n", r, g, b, c);
 #endif
-    if ((g - b) > 3 && (g - r) > 3 && c > 20)  {
-      driveData.ledState = 1;
-    }
-    else  {
-      driveData.ledState = 0;
-    }
+    // if ((g - b) > 3 && (g - r) > 3 && c > 20)  {
+    //   driveData.ledState = 1;
+    // }
+    // else  {
+    //   driveData.ledState = 0;
+    // }
   }
   
   // if too many sequential packets have dropped, assume loss of controller, restart as safety measure
@@ -245,12 +245,45 @@ void loop() {
       }
       if (inData.dir == 0)  {
         if (inData.steer == -1)  {
-          posChange[0] = (float) (-1* motorSpeed);
+          posChange[0] = (float) (-1 * motorSpeed);
           posChange[1] = (float) (motorSpeed);
         }
         if (inData.steer == 1) {
           posChange[0] = (float) (motorSpeed);
           posChange[1] = (float) (-1 * motorSpeed);
+        }
+      }
+
+      servoRight.pos = 25;
+      servoLeft.pos = 135;
+      unsigned long previousTime = 0;
+      unsigned long currentTime;
+      if (inData.sort == 1) {
+        currentTime = millis();
+        if ((g - b) > 3 && (g - r) > 3 && c > 20) {
+          servoRight.pos = 60;
+          servoLeft.pos = 90;
+          if (currentTime - previousTime > 2000)  {
+            previousTime = currentTime;
+            posChange[0] = (float) (motorSpeed);
+            posChange[1] = (float) (motorSpeed);
+          }
+          if (currentTime - previousTime > 500) {
+            previousTime = currentTime;
+            posChange[0] = 0;
+            posChange[1] = 0;
+            servoRight.pos = 25;
+            servoLeft.pos = 135;
+          }
+          ledcWrite(servoRight.chan, degreesToDutyCycle(servoRight.pos));
+          ledcWrite(servoLeft.chan, degreesToDutyCycle(servoLeft.pos));
+        }
+        else  {
+          if (currentTime - previousTime > 1000)  {
+            previousTime = currentTime;
+            posChange[0] = (float) (motorSpeed);
+            posChange[1] = (float) (motorSpeed);
+          }
         }
       }
 
@@ -317,16 +350,16 @@ void loop() {
     }
   }
 
-  if (inData.servoPos == 0)  {
-    servoRight.pos = 25;
-    servoLeft.pos = 135;
-  }
-  else  {
-    servoRight.pos = 60;
-    servoLeft.pos = 90;
-  }
-  ledcWrite(servoRight.chan, degreesToDutyCycle(servoRight.pos));
-  ledcWrite(servoLeft.chan, degreesToDutyCycle(servoLeft.pos));
+  // if (inData.servoPos == 0)  {
+  //   servoRight.pos = 25;
+  //   servoLeft.pos = 135;
+  // }
+  // else  {
+  //   servoRight.pos = 60;
+  //   servoLeft.pos = 90;
+  // }
+  // ledcWrite(servoRight.chan, degreesToDutyCycle(servoRight.pos));
+  // ledcWrite(servoLeft.chan, degreesToDutyCycle(servoLeft.pos));
 
   doHeartbeat();                                      // update heartbeat LED
 }
