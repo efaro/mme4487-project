@@ -182,6 +182,7 @@ void loop() {
   int dir[] = {1, 1};                                 // direction that motor should turn
   uint16_t r, g, b, c;
   int ledState;
+  int motorSpeed;
 
   if (tcsFlag)  {
     tcs.getRawData(&r, &g, &b, &c);
@@ -224,8 +225,39 @@ void loop() {
       lastEncoder[k] = pos[k];                        // store encoder count for next control cycle
       velMotor[k] = velEncoder[k] / cCountsRev * 60;  // calculate motor shaft velocity in rpm
 
+      
+
+
+
+
       // update target for set direction
-      posChange[k] = (float) (inData.dir * map(inData.potPos, 0, 4095, 0, cMaxChange)); // update with maximum speed
+      motorSpeed = map(inData.potPos, 0, 4095, 0, cMaxChange);
+      posChange[0] = (float) (inData.dir * motorSpeed); // update with maximum speed
+      posChange[1] = (float) (inData.dir * motorSpeed); // update with maximum speed
+
+      if (inData.dir != 0)  {
+        if (inData.steer == 1)   {   // turning right
+          posChange[1] = 0;
+        }
+        if (inData.steer == -1)  {   // turning left
+          posChange[0] = 0;
+        }
+      }
+      if (inData.dir == 0)  {
+        if (inData.steer == -1)  {
+          posChange[0] = (float) (-1* motorSpeed);
+          posChange[1] = (float) (motorSpeed);
+        }
+        if (inData.steer == 1) {
+          posChange[0] = (float) (motorSpeed);
+          posChange[1] = (float) (-1 * motorSpeed);
+        }
+      }
+
+
+
+
+
       targetF[k] = targetF[k] + posChange[k];         // set new target position
       if (k == 0) {                                   // assume differential drive
         target[k] = (long) targetF[k];                // motor 1 spins one way
@@ -252,48 +284,10 @@ void loop() {
       if (u[k] > cMaxSpeedInCounts) {                 // if control signal will saturate motor
         u[k] = cMaxSpeedInCounts;                     // impose upper limit
       }
+      //map(inData.speed, 0, 100, cMinPWM, cMaxPWM); // convert recieved signal to pwm
       pwm[k] = map(u[k], 0, cMaxSpeedInCounts, cMinPWM, cMaxPWM); // convert control signal to pwm
       if (commsLossCount < cMaxDroppedPackets / 4) {
-        
-        if (k == 0 && inData.steer == 1)  {
-          setMotor(dir[k] = 1, pwm[k], cIN1Chan[k], cIN2Chan[k]); // update motor speed and direction
-        }
-        else if (k == 0 && inData.steer == -1)  {
-          setMotor(dir[k] = -1, pwm[k], cIN1Chan[k], cIN2Chan[k]); // update motor speed and direction
-        }
-        else if (k == 1 && inData.steer == -1)  {
-          setMotor(dir[k] = -1, pwm[k], cIN1Chan[k], cIN2Chan[k]);    // only change made is instead of turning off motor, reverse direction to turn in place
-        }
-        else if (k == 1 && inData.steer == 1) {
-          setMotor(dir[k] = 1, pwm[k], cIN1Chan[k], cIN2Chan[k]);    // only change made is instead of turning off motor, reverse direction to turn in place
-        }
-        else  {
-          setMotor(dir[k], pwm[k], cIN1Chan[k], cIN2Chan[k]);
-        }
-
-        // unsigned long previousTime = 0;
-        // unsigned long currentTime = millis();
-        // if (inData.servoPos == 0)  {
-        //   servoRight.pos = 25;
-        //   servoLeft.pos = 135;
-        //   ledcWrite(servoRight.chan, degreesToDutyCycle(servoRight.pos));
-        //   ledcWrite(servoLeft.chan, degreesToDutyCycle(servoLeft.pos));
-        //   if ((currentTime - previousTime) > 2000)  {
-        //     previousTime = currentTime;
-        //     setMotor(dir[0] = 1, pwm[0], cIN1Chan[0], cIN2Chan[0]);
-        //     setMotor(dir[1] = 1, pwm[1], cIN1Chan[1], cIN2Chan[1]);
-        //   }
-
-        //   if ((currentTime - previousTime) > 1000)  {
-        //     currentTime = previousTime;
-        //     servoRight.pos = 60;
-        //     servoLeft.pos = 90;
-        //     ledcWrite(servoRight.chan, degreesToDutyCycle(servoRight.pos));
-        //     ledcWrite(servoLeft.chan, degreesToDutyCycle(servoLeft.pos));
-        //     setMotor(dir[0] = 0, pwm[0], cIN1Chan[0], cIN2Chan[0]);
-        //     setMotor(dir[1] = 0, pwm[1], cIN1Chan[1], cIN2Chan[1]);
-        //   }
-        // }
+        setMotor(dir[k], pwm[k], cIN1Chan[k], cIN2Chan[k]); // update motor speed and direction
       }
       else {
         setMotor(0, 0, cIN1Chan[k], cIN2Chan[k]);     // stop motor
