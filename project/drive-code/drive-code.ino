@@ -249,19 +249,6 @@ void loop() {
         }
       }
 
-
-      if (button)
-
-      if ((g - b) > 3 && (g - r) > 3 && c > 20)  {
-        driveData.ledState = 1;
-
-      }
-      else  {
-        driveData.ledState = 0;
-      }
-
-
-
       targetF[k] = targetF[k] + posChange[k];         // set new target position
       if (k == 0) {                                   // assume differential drive
         target[k] = (long) targetF[k];                // motor 1 spins one way
