@@ -225,11 +225,6 @@ void loop() {
       lastEncoder[k] = pos[k];                        // store encoder count for next control cycle
       velMotor[k] = velEncoder[k] / cCountsRev * 60;  // calculate motor shaft velocity in rpm
 
-      
-
-
-
-
       // update target for set direction
       motorSpeed = map(inData.potPos, 0, 4095, 0, cMaxChange);
       posChange[0] = (float) (inData.dir * motorSpeed); // update with maximum speed
@@ -255,6 +250,15 @@ void loop() {
       }
 
 
+      if (button)
+
+      if ((g - b) > 3 && (g - r) > 3 && c > 20)  {
+        driveData.ledState = 1;
+
+      }
+      else  {
+        driveData.ledState = 0;
+      }
 
 
 
