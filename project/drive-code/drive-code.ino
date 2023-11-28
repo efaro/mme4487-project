@@ -259,32 +259,25 @@ void loop() {
       unsigned long previousTime = 0;
       unsigned long currentTime;
       if (inData.sort == 1) {
-        currentTime = millis();
-        if ((g - b) > 3 && (g - r) > 3 && c > 20) {
-          servoRight.pos = 60;
-          servoLeft.pos = 90;
-          if (currentTime - previousTime > 2000)  {
-            previousTime = currentTime;
-            posChange[0] = (float) (motorSpeed);
-            posChange[1] = (float) (motorSpeed);
-          }
-          if (currentTime - previousTime > 500) {
-            previousTime = currentTime;
-            posChange[0] = 0;
-            posChange[1] = 0;
+        if ((g - b) > 3 && (g - r) > 3 && c > 20){
+          driveData.ledState = 1;
+          currentTime = millis();
+          if ((currentTime - previousTime) > 2000)  {
+            Serial.println("Good object.");
+            servoRight.pos = 60;
+            servoLeft.pos = 90;
+            posChange[0] = (float) (60);
+            posChange[1] = (float) (60);
             servoRight.pos = 25;
             servoLeft.pos = 135;
           }
-          ledcWrite(servoRight.chan, degreesToDutyCycle(servoRight.pos));
-          ledcWrite(servoLeft.chan, degreesToDutyCycle(servoLeft.pos));
         }
         else  {
-          if (currentTime - previousTime > 1000)  {
-            previousTime = currentTime;
-            posChange[0] = (float) (motorSpeed);
-            posChange[1] = (float) (motorSpeed);
-          }
+          posChange[0] = (float) (60);
+          posChange[1] = (float) (60);
         }
+        ledcWrite(servoRight.chan, degreesToDutyCycle(servoRight.pos));
+        ledcWrite(servoLeft.chan, degreesToDutyCycle(servoLeft.pos));
       }
 
 
