@@ -132,6 +132,9 @@ void loop() {
   if (curTime - lastTime > 10000) {                   // wait ~10 ms
     lastTime = curTime;
     controlData.time = curTime;                       // update transmission time
+
+
+
   
     if (!buttonReverse.state) {                           // forward pushbutton pressed
       controlData.dir = -1;
@@ -162,8 +165,22 @@ void loop() {
       Serial.println(" ");
     }
 
-    //Serial.println(buttonLeft.state);
-    //Serial.println(buttonRight.state);
+
+
+
+// Setting the servo position - dont forget to write the position in the drive code
+    if (!buttonServo.state) {
+      Serial.println("Gate is Open!");
+      controlData.servoPos = 1; // open
+    }
+    else  {
+      controlData.servoPos = 0; // closed
+    }
+
+
+
+
+
     
     // send control signal to drive
     result = esp_now_send(receiverMacAddress, (uint8_t *) &controlData, sizeof(controlData));
@@ -174,14 +191,7 @@ void loop() {
       digitalWrite(cStatusLED, 1);                    // turn on communication status LED
     }
   }
-// Setting the servo position - dont forget to write the position in the drive code
-  if (!buttonServo.state) {
-    Serial.println("Gate is Open!");
-    controlData.servoPos = 1; // open
-  }
-  else  {
-    controlData.servoPos = 0; // closed
-  }
+
   doHeartbeat();                                      // update heartbeat LED
 }
 
