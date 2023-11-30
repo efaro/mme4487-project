@@ -24,16 +24,17 @@ void ARDUINO_ISR_ATTR encoderISR(void* arg);
 void onDataRecv(const uint8_t *mac_addr, const uint8_t *incomingData, int len);
 void onDataSent(const uint8_t *mac_addr, esp_now_send_status_t status);
 
-// Control data packet structure
+// Control data packet structure - recieving from controller
 struct ControlDataPacket {
   int dir;                                            // drive direction: 1 = forward, -1 = reverse, 0 = stop
   unsigned long time;                                 // time packet sent
   int potPos; // potentiometer position
   int steer;                                          // steering direction: 1 = left, -1 = right, 0 = nothing
+  int mode;
   int servoPos;
 };
 
-// Drive data packet structure
+// Drive data packet structure - to send to controller
 struct DriveDataPacket {
   unsigned long time;                                 // time packet sent
   uint16_t r, g, b, c;
@@ -311,18 +312,22 @@ void loop() {
     }
   }
 
-  unsigned long currentTime;
-  if ((g - b) > 3 && (g - r) > 3 && c > 20){
-    detected = 1;
-  }
 
-  if (detected == 1) {
+
+
+  if (inData.mode == 1) {
+    unsigned long currentTime;
+    if ((g - b) > 3 && (g - r) > 3 && c > 20){
+      detected = 1;
+    }
+
+    if (detected == 1) {
       driveData.ledState = 1;
       Serial.println("\n Item detected");
       servoRight.pos = 60;    //open
       servoLeft.pos = 90;   //open
       currentTime = millis();
-      if ((currentTime - previousTime) > 5000)  {
+      if ((currentTime - previousTime) > 3000)  {
         previousTime = currentTime;
         driveData.ledState = 0;
         Serial.println("\n Timer over, gates closed");
@@ -331,20 +336,24 @@ void loop() {
         detected = 0;
       }
     }
+  }
 
-  // else  {
-  //   servoRight.pos = 25;    //closed
-  //   servoLeft.pos = 135;    // closed
-  // }
+  if (inData.mode == 0) {
+    if (inData.servoPos == 0)  {
+      servoRight.pos = 25;   // closed
+      servoLeft.pos = 135;
+    }
+    else  {
+      servoRight.pos = 60;   // open
+      servoLeft.pos = 90;
+    }
+  }
 
-  // if (inData.servoPos == 0)  {
-  //   servoRight.pos = 25;   // closed
-  //   servoLeft.pos = 135;
-  // }
-  // else  {
-  //   servoRight.pos = 60;   // open
-  //   servoLeft.pos = 90;
-  // }
+
+
+
+
+
   ledcWrite(servoRight.chan, degreesToDutyCycle(servoRight.pos));
   ledcWrite(servoLeft.chan, degreesToDutyCycle(servoLeft.pos));
 

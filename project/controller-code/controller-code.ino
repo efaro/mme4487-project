@@ -21,16 +21,17 @@ struct Button {
   bool lastState;                                     // last state of button
 };
 
-// Control data packet structure
+// Control data packet structure - to send to drive
 struct ControlDataPacket {
   int dir;                                            // drive direction: 1 = forward, -1 = reverse, 0 = stop
   unsigned long time;                                 // time packet sent
   int potPos; // potentiometer position
   int steer; 
+  int mode;
   int servoPos;
 };
 
-// Drive data packet structure
+// Drive data packet structure - receiving from drive
 struct DriveDataPacket {
   unsigned long time;                                 // time packet sent
   uint16_t r, g, b, c;
@@ -45,11 +46,14 @@ const long cDebounceDelay = 20;                       // button debounce delay i
 const int cMaxDroppedPackets = 20;                    // maximum number of packets allowed to drop
 const int cPotPinSpeed = 34;                          // GPIO pin of potentiometer controlling the speed of the motors
 const int cColourLED = 25;
+const int cModeSwitch = 23;
+const int cModeLED = 19;
 
 // Variables
 unsigned long lastHeartbeat = 0;                      // time of last heartbeat state change
 unsigned long lastTime = 0;                           // last time of motor control was updated
 unsigned int commsLossCount = 0;                      // number of sequential sent packets have dropped
+int scanMode = 0;                                 // true means scanning false means dumping
 Button buttonReverse = {14, 0, 0, false, true, true};     // forward, NO pushbutton on GPIO 14, low state when pressed
 Button buttonForward = {12, 0, 0, false, true, true};     // reverse, NO pushbutton on GPIO 12, low state when pressed
 Button buttonLeft = {27, 0, 0, false, true, true};
@@ -72,6 +76,8 @@ void setup() {
   // Configure GPIO
   pinMode(cHeartbeatLED, OUTPUT);                     // configure built-in LED for heartbeat as output
   pinMode(cStatusLED, OUTPUT);                        // configure GPIO for communication status LED as output
+  pinMode(cModeSwitch, INPUT);
+  pinMode(cModeLED, OUTPUT);
   pinMode(cColourLED, OUTPUT);
   pinMode(buttonReverse.pin, INPUT_PULLUP);               // configure GPIO for forward button pin as an input with pullup resistor
   attachInterruptArg(buttonReverse.pin, buttonISR, &buttonReverse, CHANGE); // Configure forward pushbutton ISR to trigger on change
@@ -169,12 +175,24 @@ void loop() {
 
 
 // Setting the servo position - dont forget to write the position in the drive code
-    if (!buttonServo.state) {
-      Serial.println("Gate is Open!");
-      controlData.servoPos = 1; // open
+
+    
+
+    if (digitalRead(cModeSwitch) == HIGH) {
+      controlData.mode = 1; // scanning
+      digitalWrite(cModeLED, HIGH);
     }
     else  {
-      controlData.servoPos = 0; // closed
+      controlData.mode = 0; // dumping
+      digitalWrite(cModeLED, LOW);
+
+      if (!buttonServo.state) {
+        controlData.servoPos = 1;
+        Serial.println("Gates Open!");
+      }
+      else  {
+        controlData.servoPos = 0;
+      }
     }
 
 
