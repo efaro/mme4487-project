@@ -79,6 +79,7 @@ const int cTCSLED = 23;
 // Variables
 unsigned long lastHeartbeat = 0;                      // time of last heartbeat state change
 unsigned long lastTime = 0;                           // last time of motor control was updated
+unsigned long previousTime;
 unsigned int commsLossCount = 0;                      // number of sequential sent packets have dropped
 Encoder encoder[] = {{25, 26, 0},                     // encoder 0 on GPIO 25 and 26, 0 position
                      {32, 33, 0}};                    // encoder 1 on GPIO 32 and 33, 0 position
@@ -87,6 +88,7 @@ Servo servoLeft = {4, 5, 0};                            // servo 2 pin, channel 
 long target[] = {0, 0};                               // target encoder count for motor
 long lastEncoder[] = {0, 0};                          // encoder count at last control cycle
 float targetF[] = {0.0, 0.0};                         // target for motor as float
+int detected;
 ControlDataPacket inData;                             // control data packet from controller
 DriveDataPacket driveData;                            // data packet to send controller
 
@@ -183,6 +185,7 @@ void loop() {
   uint16_t r, g, b, c;
   int ledState;
   int motorSpeed;
+
 
   if (tcsFlag)  {
     tcs.getRawData(&r, &g, &b, &c);
@@ -308,14 +311,40 @@ void loop() {
     }
   }
 
-  if (inData.servoPos == 0)  {
-    servoRight.pos = 25;
-    servoLeft.pos = 135;
+  unsigned long currentTime;
+  if ((g - b) > 3 && (g - r) > 3 && c > 20){
+    detected = 1;
   }
-  else  {
-    servoRight.pos = 60;
-    servoLeft.pos = 90;
-  }
+
+  if (detected == 1) {
+      driveData.ledState = 1;
+      Serial.println("\n Item detected");
+      servoRight.pos = 60;    //open
+      servoLeft.pos = 90;   //open
+      currentTime = millis();
+      if ((currentTime - previousTime) > 5000)  {
+        previousTime = currentTime;
+        driveData.ledState = 0;
+        Serial.println("\n Timer over, gates closed");
+        servoRight.pos = 25;    //closed
+        servoLeft.pos = 135;    // closed
+        detected = 0;
+      }
+    }
+
+  // else  {
+  //   servoRight.pos = 25;    //closed
+  //   servoLeft.pos = 135;    // closed
+  // }
+
+  // if (inData.servoPos == 0)  {
+  //   servoRight.pos = 25;   // closed
+  //   servoLeft.pos = 135;
+  // }
+  // else  {
+  //   servoRight.pos = 60;   // open
+  //   servoLeft.pos = 90;
+  // }
   ledcWrite(servoRight.chan, degreesToDutyCycle(servoRight.pos));
   ledcWrite(servoLeft.chan, degreesToDutyCycle(servoLeft.pos));
 
