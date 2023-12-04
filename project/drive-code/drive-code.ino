@@ -3,7 +3,7 @@
 // 
 //  Language: Arduino (C++)
 //  Target:   ESP32
-//  Author:   
+//  Author:   Eric De Faro, Laura Kowalsky, Nidhish Soochit
 //  Date:     
 //
 
@@ -28,17 +28,17 @@ void onDataSent(const uint8_t *mac_addr, esp_now_send_status_t status);
 struct ControlDataPacket {
   int dir;                                            // drive direction: 1 = forward, -1 = reverse, 0 = stop
   unsigned long time;                                 // time packet sent
-  int potPos; // potentiometer position
+  int potPos;                                         // potentiometer position responsible for controlling speed
   int steer;                                          // steering direction: 1 = left, -1 = right, 0 = nothing
-  int mode;
-  int servoPos;
+  int mode;                                           // for switching between collecting mode and dumping mode
+  int servoPos;                                       // state of servo motors (open/closed)
 };
 
 // Drive data packet structure - to send to controller
 struct DriveDataPacket {
   unsigned long time;                                 // time packet sent
-  uint16_t r, g, b, c;
-  int ledState; // 1 = on, 0 = off
+  uint16_t r, g, b, c;                                // rgbc values
+  int ledState;                                       // 1 = on, 0 = off
 };
 
 // Encoder structure
@@ -49,9 +49,9 @@ struct Encoder {
 };
 
 struct Servo  {
-  const int pin;
-  const int chan;
-  int pos;
+  const int pin;                                      // servo pin
+  const int chan;                                     // servo pwm channel
+  int pos;                                            // position angle
 };
 
 // Constants
@@ -80,16 +80,16 @@ const int cTCSLED = 23;
 // Variables
 unsigned long lastHeartbeat = 0;                      // time of last heartbeat state change
 unsigned long lastTime = 0;                           // last time of motor control was updated
-unsigned long previousTime;
+unsigned long previousTime;                           // lat time of servo control was updated
 unsigned int commsLossCount = 0;                      // number of sequential sent packets have dropped
 Encoder encoder[] = {{25, 26, 0},                     // encoder 0 on GPIO 25 and 26, 0 position
                      {32, 33, 0}};                    // encoder 1 on GPIO 32 and 33, 0 position
-Servo servoRight = {2, 4, 0};                             // servo 1 pin, channel 5, position
-Servo servoLeft = {4, 5, 0};                            // servo 2 pin, channel 6, position
+Servo servoRight = {2, 4, 0};                         // servo 1 pin, channel 5, position
+Servo servoLeft = {4, 5, 0};                          // servo 2 pin, channel 6, position
 long target[] = {0, 0};                               // target encoder count for motor
 long lastEncoder[] = {0, 0};                          // encoder count at last control cycle
 float targetF[] = {0.0, 0.0};                         // target for motor as float
-int detected;
+int detected;                                         // detection flag
 ControlDataPacket inData;                             // control data packet from controller
 DriveDataPacket driveData;                            // data packet to send controller
 
@@ -110,9 +110,9 @@ void setup() {
   pinMode(cHeartbeatLED, OUTPUT);                     // configure built-in LED for heartbeat
   pinMode(cStatusLED, OUTPUT);                        // configure GPIO for communication status LED as output
   pinMode(cTCSLED, OUTPUT);
-  ledcAttachPin(servoRight.pin, servoRight.chan);
+  ledcAttachPin(servoRight.pin, servoRight.chan);     // configure servo pin to servo channel for left and right servos
   ledcAttachPin(servoLeft.pin, servoLeft.chan);
-  ledcSetup(servoRight.chan, 50, 16);
+  ledcSetup(servoRight.chan, 50, 16);                 // both servos use the same channel
   ledcSetup(servoLeft.chan, 50, 16);
 
   // Connect to TCS34725 colour sensor
@@ -183,21 +183,21 @@ void loop() {
   float u[] = {0, 0};                                 // PID control signal
   int pwm[] = {0, 0};                                 // motor speed(s), represented in bit resolution
   int dir[] = {1, 1};                                 // direction that motor should turn
-  uint16_t r, g, b, c;
-  int ledState;
-  int motorSpeed;
+  uint16_t r, g, b, c;                                // rgbc values
+  int ledState;                                       // led for detected object
+  int motorSpeed;                                     // motor speed control variable
 
 
   if (tcsFlag)  {
-    tcs.getRawData(&r, &g, &b, &c);
+    tcs.getRawData(&r, &g, &b, &c);                   // collect raw data from TCS colour sensor
 #ifdef PRINT_COLOUR
           Serial.printf("R: %d, G: %d, B: %d, C %d\n", r, g, b, c);
 #endif
-    if ((g - b) > 3 && (g - r) > 3 && c > 20)  {
-      driveData.ledState = 1;
+    if ((g - b) > 3 && (g - r) > 3 && c > 20)  {      // configured to detect green
+      driveData.ledState = 1;                         // if green turn on led
     }
     else  {
-      driveData.ledState = 0;
+      driveData.ledState = 0;                         // else leave it off
     }
   }
   
@@ -230,25 +230,25 @@ void loop() {
       velMotor[k] = velEncoder[k] / cCountsRev * 60;  // calculate motor shaft velocity in rpm
 
       // update target for set direction
-      motorSpeed = map(inData.potPos, 0, 4095, 0, cMaxChange);
+      motorSpeed = map(inData.potPos, 0, 4095, 0, cMaxChange);  // speed is mapped to potentiometer position from the controller
       posChange[0] = (float) (inData.dir * motorSpeed); // update with maximum speed
       posChange[1] = (float) (inData.dir * motorSpeed); // update with maximum speed
 
-      if (inData.dir != 0)  {
-        if (inData.steer == 1)   {   // turning right
+      if (inData.dir != 0)  {                           // if we are driving forward/backwards and want to turn, we will stop one motor and run the other
+        if (inData.steer == 1)   {                      // turning right, stop right motor
           posChange[1] = 0;
         }
-        if (inData.steer == -1)  {   // turning left
+        if (inData.steer == -1)  {                      // turning left, stop left motor
           posChange[0] = 0;
         }
       }
-      if (inData.dir == 0)  {
+      if (inData.dir == 0)  {                           // if we are NOT driving forward/backwards and want to turn, spin motors in opposite direction
         if (inData.steer == -1)  {
-          posChange[0] = (float) (-1* motorSpeed);
+          posChange[0] = (float) (-1* motorSpeed);      // turning left
           posChange[1] = (float) (motorSpeed);
         }
         if (inData.steer == 1) {
-          posChange[0] = (float) (motorSpeed);
+          posChange[0] = (float) (motorSpeed);          // turning right
           posChange[1] = (float) (-1 * motorSpeed);
         }
       }
@@ -314,20 +314,20 @@ void loop() {
 
 
 
-
-  if (inData.mode == 1) {
+// code for detecting object
+  if (inData.mode == 1) {                             // mode = 1 to be in scanning mode, manual servo control is disabled
     unsigned long currentTime;
-    if ((g - b) > 3 && (g - r) > 3 && c > 20){
+    if ((g - b) > 3 && (g - r) > 3 && c > 20){        // if object is detected trigger the detected flag
       detected = 1;
     }
 
-    if (detected == 1) {
-      driveData.ledState = 1;
+    if (detected == 1) {                              // if object detected
+      driveData.ledState = 1;                         // illuminate LED
       Serial.println("\n Item detected");
-      servoRight.pos = 60;    //open
-      servoLeft.pos = 90;   //open
-      currentTime = millis();
-      if ((currentTime - previousTime) > 3000)  {
+      servoRight.pos = 60;                            // open right servo arm
+      servoLeft.pos = 90;                             // open left servo arm
+      currentTime = millis();                         // start a timer
+      if ((currentTime - previousTime) > 3000)  {     // after 3 seconds, turn off LED, close servos and reset detected flag
         previousTime = currentTime;
         driveData.ledState = 0;
         Serial.println("\n Timer over, gates closed");
@@ -338,7 +338,7 @@ void loop() {
     }
   }
 
-  if (inData.mode == 0) {
+  if (inData.mode == 0) {                             // mode = 0 to be in manual mode, allows manual control of servo arms to allow driver to dump objects
     if (inData.servoPos == 0)  {
       servoRight.pos = 25;   // closed
       servoLeft.pos = 135;
@@ -348,12 +348,6 @@ void loop() {
       servoLeft.pos = 90;
     }
   }
-
-
-
-
-
-
   ledcWrite(servoRight.chan, degreesToDutyCycle(servoRight.pos));
   ledcWrite(servoLeft.chan, degreesToDutyCycle(servoLeft.pos));
 

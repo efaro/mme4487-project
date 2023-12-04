@@ -25,17 +25,17 @@ struct Button {
 struct ControlDataPacket {
   int dir;                                            // drive direction: 1 = forward, -1 = reverse, 0 = stop
   unsigned long time;                                 // time packet sent
-  int potPos; // potentiometer position
-  int steer; 
-  int mode;
-  int servoPos;
+  int potPos;                                         // potentiometer position responsible for controlling speed
+  int steer;                                          // steering direction: 1 = left, -1 = right, 0 = nothing
+  int mode;                                           // for switching between collecting mode and dumping mode
+  int servoPos;                                       // state of servo motors (open/closed)
 };
 
 // Drive data packet structure - receiving from drive
 struct DriveDataPacket {
   unsigned long time;                                 // time packet sent
-  uint16_t r, g, b, c;
-  int ledState;
+  uint16_t r, g, b, c;                                // rgbc values
+  int ledState;                                       // led for object detected
 };
 
 // Constants
@@ -45,26 +45,26 @@ const int cStatusLED = 26;                            // GPIO pin of communicati
 const long cDebounceDelay = 20;                       // button debounce delay in milliseconds
 const int cMaxDroppedPackets = 20;                    // maximum number of packets allowed to drop
 const int cPotPinSpeed = 34;                          // GPIO pin of potentiometer controlling the speed of the motors
-const int cColourLED = 25;
-const int cModeSwitch = 23;
-const int cModeLED = 19;
+const int cColourLED = 25;                            // TCS led pin
+const int cModeSwitch = 23;                           // mode switcher pin
+const int cModeLED = 19;                              // mode led pin
 
 // Variables
-unsigned long lastHeartbeat = 0;                      // time of last heartbeat state change
-unsigned long lastTime = 0;                           // last time of motor control was updated
-unsigned int commsLossCount = 0;                      // number of sequential sent packets have dropped
-int scanMode = 0;                                 // true means scanning false means dumping
+unsigned long lastHeartbeat = 0;                          // time of last heartbeat state change
+unsigned long lastTime = 0;                               // last time of motor control was updated
+unsigned int commsLossCount = 0;                          // number of sequential sent packets have dropped
+int scanMode = 0;                                         // true means scanning false means dumping
 Button buttonReverse = {14, 0, 0, false, true, true};     // forward, NO pushbutton on GPIO 14, low state when pressed
 Button buttonForward = {12, 0, 0, false, true, true};     // reverse, NO pushbutton on GPIO 12, low state when pressed
-Button buttonLeft = {27, 0, 0, false, true, true};
-Button buttonRight = {13, 0, 0, false, true, true};
-Button buttonServo = {21, 0, 0, false, true, true};   // button for manually opening/closing servo motor
+Button buttonLeft = {27, 0, 0, false, true, true};        // left, NO pushbutton on GPIO 27, low state when pressed
+Button buttonRight = {13, 0, 0, false, true, true};       // right, NO pushbutton on GPIO 27, low state when pressed
+Button buttonServo = {21, 0, 0, false, true, true};       // button for opening/closing servo motor in manual mode
 
 // REPLACE WITH MAC ADDRESS OF YOUR DRIVE ESP32 - B0:A7:32:28:8B:B4
 uint8_t receiverMacAddress[] = {0xE0,0xE2,0xE6,0x0C,0x49,0x64};  // MAC address of drive 00:01:02:03:04:05 
-esp_now_peer_info_t peerInfo = {};                    // ESP-NOW peer information
-ControlDataPacket controlData;                        // data packet to send to drive system
-DriveDataPacket inData;                               // data packet from drive system
+esp_now_peer_info_t peerInfo = {};                               // ESP-NOW peer information
+ControlDataPacket controlData;                                   // data packet to send to drive system
+DriveDataPacket inData;                                          // data packet from drive system
 
 void setup() {
   Serial.begin(115200);                               // standard baud rate for ESP32 serial monitor
@@ -89,7 +89,7 @@ void setup() {
   attachInterruptArg(buttonRight.pin, buttonISR, &buttonRight, CHANGE);
   pinMode(buttonServo.pin, INPUT_PULLUP);
   attachInterruptArg(buttonServo.pin, buttonISR, &buttonServo, CHANGE);
-  pinMode(cPotPinSpeed, INPUT);  // potentiometer pin 
+  pinMode(cPotPinSpeed, INPUT);                           // potentiometer pin configured for input
 
   // Initialize ESP-NOW
   if (esp_now_init() != ESP_OK) 
@@ -178,27 +178,22 @@ void loop() {
 
     
 
-    if (digitalRead(cModeSwitch) == HIGH) {
-      controlData.mode = 1; // scanning
-      digitalWrite(cModeLED, HIGH);
+    if (digitalRead(cModeSwitch) == HIGH) {           // mode switch for automatic mode
+      controlData.mode = 1;                           // send data to drive to start scanning
+      digitalWrite(cModeLED, HIGH);                   // illuminate led as indicator on controller
     }
-    else  {
-      controlData.mode = 0; // dumping
+    else  {                                           // mode for manual mode
+      controlData.mode = 0;
       digitalWrite(cModeLED, LOW);
 
-      if (!buttonServo.state) {
-        controlData.servoPos = 1;
+      if (!buttonServo.state) {                       // button press in manual mode opens the servo arms
+        controlData.servoPos = 1;                     // send data to drive
         Serial.println("Gates Open!");
       }
       else  {
-        controlData.servoPos = 0;
+        controlData.servoPos = 0;                     // if button is not pressed, keep gates closed
       }
     }
-
-
-
-
-
     
     // send control signal to drive
     result = esp_now_send(receiverMacAddress, (uint8_t *) &controlData, sizeof(controlData));
