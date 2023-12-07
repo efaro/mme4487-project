@@ -1,3 +1,12 @@
+// 
+// MME 4487 Project Drive Code
+// 
+//  Language: Arduino (C++)
+//  Target:   ESP32
+//  Author:   Eric De Faro, Laura Kowalsky, Nidhish Soochit
+//  Date:     December 8th 2023
+//
+
 // #define PRINT_SEND_STATUS                             // uncomment to turn on output packet send status
 // #define PRINT_INCOMING                                // uncomment to turn on output of incoming data
 

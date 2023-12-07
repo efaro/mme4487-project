@@ -4,7 +4,7 @@
 //  Language: Arduino (C++)
 //  Target:   ESP32
 //  Author:   Eric De Faro, Laura Kowalsky, Nidhish Soochit
-//  Date:     
+//  Date:     December 8th 2023
 //
 
 // #define SERIAL_STUDIO                                 // print formatted string, that can be captured and parsed by Serial-Studio
